@@ -1,0 +1,195 @@
+<html>
+  <head>
+    <title>Office capacity</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 0;
+        padding: 20px;
+      }
+      #calendar_table {
+        display: flex;
+        flex-wrap: wrap;
+        margin-bottom: 50px;
+      }
+      .employees {
+        color: silver;
+        font-size: 12px;
+      }
+      .date {
+        font-size: 12px;
+        padding-bottom: 5px;
+      }
+      .capacity {
+        padding-bottom: 5px;
+        font-weight: 700;
+      }
+      .day {
+        width: calc(14%);
+        padding: 20px;
+        overflow: hidden;
+        box-sizing: border-box;
+        border: #eeeeee 1px solid;
+      }
+      @media (max-width: 800px) {
+        .day {
+          width: 100%;
+        }
+      }
+      .day .line {
+        background-color: #00ff00;
+        width: 100%;
+        height: 10px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+      .day.red .line {
+        background-color: #ff0000;
+      }
+      .day.yellow .line {
+        background-color: #ffff00;
+      }
+      .day.weekend {
+        color: #eeeeee;
+      }
+      .day.weekend .line {
+        background-color: #eeeeee;
+      }
+      .day.past {
+        color: #bbbbbb;
+      }
+      .day.past .line {
+        background-color: #bbbbbb;
+      }
+    </style>
+    <script type="text/javascript">
+      const n8nWebhookUrl =
+        "[COPY WEBHOOK URL HERE]";
+
+      const isThisWeekOrLater = (someDate) => {
+        const today = new Date();
+        const monday = today.setDate(today.getDate() - today.getDay());
+        if (someDate > monday) {
+          return true;
+        }
+
+        return isToday(someDate);
+      };
+
+      const isToday = (someDate) => {
+        const today = new Date();
+        return (
+          someDate.getDate() == today.getDate() &&
+          someDate.getMonth() == today.getMonth() &&
+          someDate.getFullYear() == today.getFullYear()
+        );
+      };
+
+      const isInThePast = (someDate) => {
+        if (isToday(someDate)) {
+          return false;
+        }
+        return someDate < new Date();
+      };
+
+      const getDateString = (currentDay) => {
+        var dateString = currentDay.toLocaleDateString("en-gb", {
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+        if (isToday(currentDay)) {
+          dateString = "Today";
+        }
+        return dateString;
+      };
+
+      const createDiv = (className, parent) => {
+        var el = document.createElement("DIV");
+        el.classList.add(className);
+        if (parent) {
+          parent.appendChild(el);
+        }
+        return el;
+      };
+
+      const createDayElement = (rootElement, d) => {
+        var currentDay = new Date(d.day);
+        var dayElement = createDiv("day", rootElement);
+
+        var lineElement = createDiv("line", dayElement);
+
+        var dateElement = createDiv("date", dayElement);
+        dateElement.innerHTML = getDateString(currentDay);
+
+        var capacityElement = createDiv("capacity", dayElement);
+        capacityElement.innerHTML = `People in: ${d.total}`;
+
+        var employeesElement = createDiv("employees", dayElement);
+        employeesElement.innerHTML = d.employees.join(", ");
+        return dayElement;
+      };
+
+      const drawCalendar = (
+        data,
+        rootElementId,
+        warningThreshold,
+        errorThreshold
+      ) => {
+        data.days.forEach((d) => {
+          var currentDay = new Date(d.day);
+
+          if (!isThisWeekOrLater(currentDay)) {
+            return;
+          }
+
+          var dayElement = createDayElement(
+            document.getElementById(rootElementId),
+            d
+          );
+
+          if (
+            currentDay.getDay() == 6 ||
+            currentDay.getDay() == 0 ||
+            d.holiday === true
+          ) {
+            dayElement.classList.add("weekend");
+          } else if (isInThePast(currentDay)) {
+            dayElement.classList.add("past");
+          } else if (d.total > errorThreshold) {
+            dayElement.classList.add("red");
+          } else if (d.total > warningThreshold) {
+            dayElement.classList.add("yellow");
+          }
+        });
+      };
+
+      const initCalendar = (
+        rootElementId,
+        warningThreshold,
+        errorThreshold
+      ) => {
+        fetch(n8nWebhookUrl, {
+          method: "get",
+        }).then(function (response) {
+          response
+            .json()
+            .then((x) => {
+              drawCalendar(x, rootElementId, warningThreshold, errorThreshold);
+            })
+            .catch(function (err) {
+              console.log(err);
+            });
+        });
+      };
+
+      initCalendar("calendar_table", 8, 9);
+    </script>
+  </head>
+  <body>
+    <h1>Office capacity</h1>
+    <div id="calendar_table"></div>
+  </body>
+</html>

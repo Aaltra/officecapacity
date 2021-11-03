@@ -1,0 +1,227 @@
+{
+  "name": "Officient - office capacity 2 months",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        210,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "https://api.officient.io/1.0/people/list",
+        "options": {}
+      },
+      "name": "Officient: get people",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        410,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": "Officient"
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "=https://api.officient.io/1.0/calendar/{{$json[\"id\"]}}/{{$json[\"year\"]}}/{{$json[\"month\"]}}",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": []
+        }
+      },
+      "name": "Officient: get calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": "Officient"
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "var list = items[0].json.data\nvar result = []\nfor(item of list){\n  var newItem = {}\n  item.year = new Date().getFullYear();\n  item.month = new Date().getMonth()+1;\n  item.day = new Date().getDate()\n  newItem.json = item\n  result.push(newItem)\n}\n\nreturn result;\n"
+      },
+      "name": "Function: Prepare employee data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "function inTheOffice(time_off) {\n  var remoteEvent = null;\n  var working = time_off.events.length === 0;\n  if (time_off.events.length > 0) {\n    for (event of time_off.events) {\n      if (event.name === \"Remote work\") {\n        remoteEvent = event;\n      } else if (\n        event.name.indexOf(\"hackathon\") >= 0 ||\n        event.name.indexOf(\"Vaaltra\") >= 0\n      ) {\n        working = true;\n      }\n    }\n  }\n  var inTheOffice = false;\n  if (\n    ((remoteEvent !== null && remoteEvent.duration_minutes < 300) || working) &&\n    time_off.scheduled_minutes > 0\n  ) {\n    inTheOffice = true;\n  }\n  return inTheOffice;\n}\n\nfunction exists(date, days_off){\n  for(daysOff of days_off){\n    if(daysOff.date === date){\n      return true;\n    }\n  }\n  return false;\n}\n\nfunction processEmployees(employees) {\n  var employeeIdx = 0;\n  for (employee of employees) {\n    var dayIdx = dayStartIdx;\n\n    var name = $items(\"Function: Prepare employee data\")[employeeIdx].json.name;\n    for (timeOff of employee.json.data.time_off) {\n      var response = inTheOffice(timeOff);\n      \n      if (days[dayIdx] == null) {\n        days[dayIdx] = { day: timeOff.date, total: 0, employees: [], holiday: false };\n      }\n      //If it is a company holiday, nobody will be in the office\n      if(exists(timeOff.date, employee.json.data.company_days_off)){\n        response = false;\n        days[dayIdx].holiday = true;\n      }\n      \n      if (response) {\n        days[dayIdx].total = days[dayIdx].total + 1;\n        days[dayIdx].employees.push(name);\n      }\n      dayIdx++;\n    }\n    employeeIdx++;\n  }\n}\n\nvar persons = [];\nconst days = [];\nvar dayStartIdx = 0;\nprocessEmployees(items);\nvar dayStartIdx = days.length;\nprocessEmployees($items(\"Officient: get calendar next month\"));\n\nreturn [{ json: { days } }];\n\n"
+      },
+      "name": "Function: Prepare response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1270,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value2": "={{$runIndex==1}}"
+            }
+          ]
+        }
+      },
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        370
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "=https://api.officient.io/1.0/calendar/{{$json[\"id\"]}}/{{$json[\"year\"]}}/{{$json[\"month\"]+1}}",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": []
+        }
+      },
+      "name": "Officient: get calendar next month",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        850,
+        450
+      ],
+      "alwaysOutputData": false,
+      "credentials": {
+        "oAuth2Api": "Officient"
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "path": "93a76bdb-88de-4709-b787-79a533907e57",
+        "responseMode": "lastNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "access-control-allow-origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        210,
+        510
+      ],
+      "webhookId": "93a76bdb-88de-4709-b787-79a533907e57"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Officient: get people",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Officient: get people": {
+      "main": [
+        [
+          {
+            "node": "Function: Prepare employee data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Officient: get calendar": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function: Prepare employee data": {
+      "main": [
+        [
+          {
+            "node": "Officient: get calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Officient: get calendar next month",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Function: Prepare response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Officient: get calendar next month": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Officient: get people",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": 17
+}
