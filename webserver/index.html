@@ -8,7 +8,7 @@
         margin: 0;
         padding: 20px;
       }
-      #calendar_table {
+      #calendar-table {
         display: flex;
         flex-wrap: wrap;
         margin-bottom: 50px;
@@ -115,8 +115,8 @@
         return el;
       };
 
-      const createDayElement = (rootElement, d) => {
-        var currentDay = new Date(d.day);
+      const createDayElement = (rootElement, workDay) => {
+        var currentDay = new Date(workDay.day);
         var dayElement = createDiv("day", rootElement);
 
         var lineElement = createDiv("line", dayElement);
@@ -125,10 +125,10 @@
         dateElement.innerHTML = getDateString(currentDay);
 
         var capacityElement = createDiv("capacity", dayElement);
-        capacityElement.innerHTML = `People in: ${d.total}`;
+        capacityElement.innerHTML = `People in: ${workDay.total}`;
 
         var employeesElement = createDiv("employees", dayElement);
-        employeesElement.innerHTML = d.employees.join(", ");
+        employeesElement.innerHTML = workDay.employees.join(", ");
         return dayElement;
       };
 
@@ -138,8 +138,8 @@
         warningThreshold,
         errorThreshold
       ) => {
-        data.days.forEach((d) => {
-          var currentDay = new Date(d.day);
+        data.days.forEach((workDay) => {
+          var currentDay = new Date(workDay.day);
 
           if (!isThisWeekOrLater(currentDay)) {
             return;
@@ -147,20 +147,20 @@
 
           var dayElement = createDayElement(
             document.getElementById(rootElementId),
-            d
+            workDay
           );
 
           if (
             currentDay.getDay() == 6 ||
             currentDay.getDay() == 0 ||
-            d.holiday === true
+            workDay.holiday === true
           ) {
             dayElement.classList.add("weekend");
           } else if (isInThePast(currentDay)) {
             dayElement.classList.add("past");
-          } else if (d.total > errorThreshold) {
+          } else if (workDay.total > errorThreshold) {
             dayElement.classList.add("red");
-          } else if (d.total > warningThreshold) {
+          } else if (workDay.total > warningThreshold) {
             dayElement.classList.add("yellow");
           }
         });
@@ -179,17 +179,17 @@
             .then((x) => {
               drawCalendar(x, rootElementId, warningThreshold, errorThreshold);
             })
-            .catch(function (err) {
+            .catch((err) => {
               console.log(err);
             });
         });
       };
 
-      initCalendar("calendar_table", 8, 9);
+      initCalendar("calendar-table", 8, 9);
     </script>
   </head>
   <body>
     <h1>Office capacity</h1>
-    <div id="calendar_table"></div>
+    <div id="calendar-table"></div>
   </body>
 </html>
